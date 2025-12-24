@@ -1,5 +1,5 @@
 [build]
-  command = "cd \"damon_service_-_pricing_&_project_management_kkc6qh_dualiteproject\" && npm install && npm run build"
-  publish = "damon_service_-_pricing_&_project_management_kkc6qh_dualiteproject/dist"
-  ignore = "false"  # Never skip build
-  force = "true"    # Force build even if no changes detected
+command = "npx vite build"
+publish = "dist"
+ignore = "false"
+force = "true"
