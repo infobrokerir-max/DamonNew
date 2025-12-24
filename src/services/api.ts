@@ -1,10 +1,7 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { 
-  USERS, CATEGORIES, DEVICES, SETTINGS, PROJECTS, COMMENTS, INQUIRIES 
-} from '../lib/mock-db';
-import { 
-  User, Project, Device, Settings, ProjectComment, ProjectInquiry, Role, PublicDevice, Category, PriceBreakdown, InquiryStatus 
+import { supabase } from '../lib/supabase';
+import {
+  User, Project, Device, Settings, ProjectComment, ProjectInquiry, Category, PublicDevice, PriceBreakdown, InquiryStatus, Role
 } from '../lib/types';
 import { calculatePrice } from '../lib/pricing';
 
@@ -13,257 +10,497 @@ interface AppState {
   users: User[];
   categories: Category[];
   devices: Device[];
-  settings: Settings;
+  settings: Settings | null;
   projects: Project[];
   comments: ProjectComment[];
   inquiries: ProjectInquiry[];
-  
-  // Sync Status
-  isSyncing: boolean;
-  syncError: string | null;
-  
-  // Auth
-  login: (username: string, password: string) => boolean;
-  logout: () => void;
-  
-  // User Management
-  createUser: (user: Omit<User, 'id' | 'is_active'>) => void;
-  deleteUser: (userId: string) => void;
 
-  // Category Management
-  createCategory: (name: string, desc?: string) => void;
-  updateCategory: (id: string, name: string, desc?: string) => void;
-  deleteCategory: (id: string) => void;
+  isLoading: boolean;
+  error: string | null;
 
-  // Device Management
-  createDevice: (device: Omit<Device, 'id' | 'is_active'>) => void;
-  updateDevice: (id: string, device: Partial<Omit<Device, 'id' | 'is_active'>>) => void;
-  deleteDevice: (id: string) => void;
+  initialize: () => Promise<void>;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
 
-  // Project Actions
-  createProject: (project: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'status'>) => void;
-  updateProjectStatus: (projectId: string, status: Project['status'], note?: string) => void;
-  deleteProject: (projectId: string) => void;
-  
-  // Inquiry Actions
-  requestInquiry: (projectId: string, deviceId: string) => void;
-  approveInquiry: (inquiryId: string) => void;
-  rejectInquiry: (inquiryId: string) => void;
-  
-  // Comment Actions
-  addComment: (projectId: string, body: string, parentId?: string) => void;
-  
-  // Admin Actions
-  updateSettings: (newSettings: Partial<Settings>) => void;
-  
-  // Google Sheets Sync
-  syncWithGoogleSheets: () => Promise<void>;
+  fetchUsers: () => Promise<void>;
+  createUser: (user: Omit<User, 'id' | 'is_active'>) => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
+
+  fetchCategories: () => Promise<void>;
+  createCategory: (name: string, desc?: string) => Promise<void>;
+  updateCategory: (id: string, name: string, desc?: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+
+  fetchDevices: () => Promise<void>;
+  createDevice: (device: Omit<Device, 'id' | 'is_active'>) => Promise<void>;
+  updateDevice: (id: string, device: Partial<Omit<Device, 'id' | 'is_active'>>) => Promise<void>;
+  deleteDevice: (id: string) => Promise<void>;
+
+  fetchSettings: () => Promise<void>;
+  updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
+
+  fetchProjects: () => Promise<void>;
+  createProject: (project: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'status'>) => Promise<void>;
+  updateProjectStatus: (projectId: string, status: Project['status'], note?: string) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
+
+  fetchInquiries: () => Promise<void>;
+  requestInquiry: (projectId: string, deviceId: string) => Promise<void>;
+  approveInquiry: (inquiryId: string) => Promise<void>;
+  rejectInquiry: (inquiryId: string) => Promise<void>;
+
+  fetchComments: (projectId: string) => Promise<void>;
+  addComment: (projectId: string, body: string, parentId?: string) => Promise<void>;
 }
 
-// Helper to send data to Google Sheets (Fire and Forget or Await)
-const syncAction = async (action: string, payload: any, state: AppState) => {
-  const url = state.settings.google_script_url;
-  if (!url) return;
+export const useStore = create<AppState>((set, get) => ({
+  currentUser: null,
+  users: [],
+  categories: [],
+  devices: [],
+  settings: null,
+  projects: [],
+  comments: [],
+  inquiries: [],
 
-  try {
-    // We use no-cors mode usually for Google Scripts if we don't need response, 
-    // but here we want to ensure it's saved.
-    // Note: Google Apps Script Web App must be deployed as "Anyone" for this to work from browser without OAuth.
-    await fetch(url, {
-      method: 'POST',
-      mode: 'no-cors', 
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, payload })
-    });
-  } catch (e) {
-    console.error("Google Sync Error:", e);
-  }
-};
+  isLoading: false,
+  error: null,
 
-export const useStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      currentUser: null,
-      users: USERS,
-      categories: CATEGORIES,
-      devices: DEVICES,
-      settings: SETTINGS,
-      projects: PROJECTS,
-      comments: COMMENTS,
-      inquiries: INQUIRIES,
-      
-      isSyncing: false,
-      syncError: null,
+  initialize: async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
 
-      login: (username, password) => {
-        const user = get().users.find(u => u.username === username && u.password === password);
-        if (user) {
-          set({ currentUser: user });
-          return true;
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profile) {
+          set({ currentUser: profile as User });
+          await Promise.all([
+            get().fetchCategories(),
+            get().fetchDevices(),
+            get().fetchSettings(),
+            get().fetchProjects(),
+            get().fetchUsers(),
+            get().fetchInquiries()
+          ]);
         }
+      }
+    } catch (error) {
+      console.error('Initialization error:', error);
+      set({ error: 'خطا در بارگذاری اطلاعات' });
+    }
+  },
+
+  login: async (username, password) => {
+    try {
+      set({ isLoading: true, error: null });
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('username', username)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!profile) {
+        set({ error: 'نام کاربری یا رمز عبور اشتباه است', isLoading: false });
         return false;
-      },
+      }
 
-      logout: () => set({ currentUser: null }),
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: `${username}@damon.local`,
+        password: password,
+      });
 
-      createUser: (userData) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
+      if (error) {
+        set({ error: 'خطا در ورود', isLoading: false });
+        return false;
+      }
 
-        const newUser: User = {
-          id: `u-${Date.now()}`,
-          is_active: true,
-          ...userData
-        };
-        set(state => ({ users: [...state.users, newUser] }));
-        syncAction('create_user', newUser, get());
-      },
+      if (data.user) {
+        set({ currentUser: profile as User, isLoading: false });
+        await get().initialize();
+        return true;
+      }
 
-      deleteUser: (userId) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
-        if (userId === currentUser.id) return;
-        set(state => ({ users: state.users.filter(u => u.id !== userId) }));
-        syncAction('delete_user', { id: userId }, get());
-      },
+      set({ isLoading: false });
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      set({ error: 'خطا در ورود', isLoading: false });
+      return false;
+    }
+  },
 
-      // --- Category Management ---
-      createCategory: (name, desc) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
-        const newCat: Category = { id: `c-${Date.now()}`, category_name: name, description: desc };
-        set(state => ({ categories: [...state.categories, newCat] }));
-        syncAction('create_category', newCat, get());
-      },
+  logout: async () => {
+    await supabase.auth.signOut();
+    set({
+      currentUser: null,
+      users: [],
+      categories: [],
+      devices: [],
+      settings: null,
+      projects: [],
+      comments: [],
+      inquiries: []
+    });
+  },
 
-      updateCategory: (id, name, desc) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
-        const updated = { id, category_name: name, description: desc };
-        set(state => ({
-          categories: state.categories.map(c => 
-            c.id === id ? { ...c, ...updated } : c
-          )
-        }));
-        syncAction('update_category', updated, get());
-      },
+  fetchUsers: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      deleteCategory: (id) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
-        set(state => ({ categories: state.categories.filter(c => c.id !== id) }));
-        syncAction('delete_category', { id }, get());
-      },
+      if (error) throw error;
+      set({ users: data as User[] });
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  },
 
-      // --- Device Management ---
-      createDevice: (deviceData) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
-        const newDevice: Device = { id: `d-${Date.now()}`, is_active: true, ...deviceData };
-        set(state => ({ devices: [...state.devices, newDevice] }));
-        syncAction('create_device', newDevice, get());
-      },
+  createUser: async (userData) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
 
-      updateDevice: (id, deviceData) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
-        set(state => ({
-          devices: state.devices.map(d => 
-            d.id === id ? { ...d, ...deviceData } : d
-          )
-        }));
-        syncAction('update_device', { id, ...deviceData }, get());
-      },
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: `${userData.username}@damon.local`,
+        password: userData.password || '123456',
+      });
 
-      deleteDevice: (id) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
-        set(state => ({ devices: state.devices.filter(d => d.id !== id) }));
-        syncAction('delete_device', { id }, get());
-      },
+      if (authError) throw authError;
 
-      createProject: (projectData) => {
-        const { currentUser } = get();
-        if (!currentUser) return;
-        
-        const newProject: Project = {
-          id: `p-${Date.now()}`,
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            full_name: userData.full_name,
+            username: userData.username,
+            role: userData.role,
+            is_active: true,
+          });
+
+        if (profileError) throw profileError;
+        await get().fetchUsers();
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
+      set({ error: 'خطا در ایجاد کاربر' });
+    }
+  },
+
+  deleteUser: async (userId) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin' || userId === currentUser.id) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+      await get().fetchUsers();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+    }
+  },
+
+  fetchCategories: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('category_name');
+
+      if (error) throw error;
+      set({ categories: data as Category[] });
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  },
+
+  createCategory: async (name, desc) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
+
+      const { error } = await supabase
+        .from('categories')
+        .insert({ category_name: name, description: desc });
+
+      if (error) throw error;
+      await get().fetchCategories();
+    } catch (error) {
+      console.error('Error creating category:', error);
+    }
+  },
+
+  updateCategory: async (id, name, desc) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
+
+      const { error } = await supabase
+        .from('categories')
+        .update({ category_name: name, description: desc })
+        .eq('id', id);
+
+      if (error) throw error;
+      await get().fetchCategories();
+    } catch (error) {
+      console.error('Error updating category:', error);
+    }
+  },
+
+  deleteCategory: async (id) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
+
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await get().fetchCategories();
+    } catch (error) {
+      console.error('Error deleting category:', error);
+    }
+  },
+
+  fetchDevices: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('devices')
+        .select('*')
+        .order('model_name');
+
+      if (error) throw error;
+      set({ devices: data as Device[] });
+    } catch (error) {
+      console.error('Error fetching devices:', error);
+    }
+  },
+
+  createDevice: async (deviceData) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
+
+      const { error } = await supabase
+        .from('devices')
+        .insert({ ...deviceData, is_active: true });
+
+      if (error) throw error;
+      await get().fetchDevices();
+    } catch (error) {
+      console.error('Error creating device:', error);
+    }
+  },
+
+  updateDevice: async (id, deviceData) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
+
+      const { error } = await supabase
+        .from('devices')
+        .update(deviceData)
+        .eq('id', id);
+
+      if (error) throw error;
+      await get().fetchDevices();
+    } catch (error) {
+      console.error('Error updating device:', error);
+    }
+  },
+
+  deleteDevice: async (id) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
+
+      const { error } = await supabase
+        .from('devices')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await get().fetchDevices();
+    } catch (error) {
+      console.error('Error deleting device:', error);
+    }
+  },
+
+  fetchSettings: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error) throw error;
+      set({ settings: data as Settings });
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    }
+  },
+
+  updateSettings: async (newSettings) => {
+    try {
+      const { currentUser, settings } = get();
+      if (currentUser?.role !== 'admin' || !settings) return;
+
+      const { error } = await supabase
+        .from('settings')
+        .update({ ...newSettings, updated_at: new Date().toISOString() })
+        .eq('id', settings.id);
+
+      if (error) throw error;
+      await get().fetchSettings();
+    } catch (error) {
+      console.error('Error updating settings:', error);
+    }
+  },
+
+  fetchProjects: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      set({ projects: data as Project[] });
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    }
+  },
+
+  createProject: async (projectData) => {
+    try {
+      const { currentUser } = get();
+      if (!currentUser) return;
+
+      const { error } = await supabase
+        .from('projects')
+        .insert({
+          ...projectData,
           created_by_user_id: currentUser.id,
           status: 'pending_approval',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          ...projectData,
-        };
-        set(state => ({ projects: [newProject, ...state.projects] }));
-        syncAction('create_project', newProject, get());
-      },
+        });
 
-      updateProjectStatus: (projectId, status, note) => {
-        const { currentUser } = get();
-        if (!currentUser || (currentUser.role !== 'sales_manager' && currentUser.role !== 'admin')) return;
+      if (error) throw error;
+      await get().fetchProjects();
+    } catch (error) {
+      console.error('Error creating project:', error);
+      set({ error: 'خطا در ایجاد پروژه' });
+    }
+  },
 
-        const updateData = { 
-          status, 
+  updateProjectStatus: async (projectId, status, note) => {
+    try {
+      const { currentUser } = get();
+      if (!currentUser || (currentUser.role !== 'sales_manager' && currentUser.role !== 'admin')) return;
+
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          status,
           updated_at: new Date().toISOString(),
           approval_decision_by: currentUser.id,
           approval_decision_at: new Date().toISOString(),
-          approval_note: note 
-        };
+          approval_note: note,
+        })
+        .eq('id', projectId);
 
-        set(state => ({
-          projects: state.projects.map(p => 
-            p.id === projectId ? { ...p, ...updateData } : p
-          ),
-          comments: [...state.comments, {
-            id: `cm-sys-${Date.now()}`,
-            project_id: projectId,
-            author_user_id: currentUser.id,
-            author_role_snapshot: currentUser.role,
-            body: `وضعیت پروژه به «${status}» تغییر یافت.${note ? ` توضیح: ${note}` : ''}`,
-            created_at: new Date().toISOString()
-          }]
-        }));
-        
-        syncAction('update_project_status', { id: projectId, ...updateData }, get());
-      },
+      if (error) throw error;
 
-      deleteProject: (projectId) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
+      await supabase
+        .from('project_comments')
+        .insert({
+          project_id: projectId,
+          author_user_id: currentUser.id,
+          author_role_snapshot: currentUser.role,
+          body: `وضعیت پروژه به «${status}» تغییر یافت.${note ? ` توضیح: ${note}` : ''}`,
+        });
 
-        set(state => ({
-          projects: state.projects.filter(p => p.id !== projectId),
-          // Cleanup related data
-          comments: state.comments.filter(c => c.project_id !== projectId),
-          inquiries: state.inquiries.filter(i => i.project_id !== projectId)
-        }));
-        syncAction('delete_project', { id: projectId }, get());
-      },
+      await get().fetchProjects();
+    } catch (error) {
+      console.error('Error updating project status:', error);
+    }
+  },
 
-      requestInquiry: (projectId, deviceId) => {
-        const { currentUser, devices, settings, projects } = get();
-        if (!currentUser) return;
+  deleteProject: async (projectId) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
 
-        const project = projects.find(p => p.id === projectId);
-        if (!project) return;
-        
-        if (currentUser.role === 'employee' && project.status !== 'approved' && project.status !== 'in_progress' && project.status !== 'quoted') {
-          alert("استعلام فقط برای پروژه‌های تایید شده مجاز است.");
-          return;
-        }
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
 
-        const device = devices.find(d => d.id === deviceId);
-        if (!device) return;
+      if (error) throw error;
+      await get().fetchProjects();
+    } catch (error) {
+      console.error('Error deleting project:', error);
+    }
+  },
 
-        const breakdown = calculatePrice(
-          device.factory_pricelist_eur,
-          device.length_meter,
-          device.weight_unit,
-          settings
-        );
+  fetchInquiries: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('project_inquiries')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        const newInquiry: ProjectInquiry = {
-          id: `inq-${Date.now()}`,
+      if (error) throw error;
+      set({ inquiries: data as ProjectInquiry[] });
+    } catch (error) {
+      console.error('Error fetching inquiries:', error);
+    }
+  },
+
+  requestInquiry: async (projectId, deviceId) => {
+    try {
+      const { currentUser, devices, settings, projects } = get();
+      if (!currentUser || !settings) return;
+
+      const project = projects.find(p => p.id === projectId);
+      if (!project) return;
+
+      if (currentUser.role === 'employee' &&
+          project.status !== 'approved' &&
+          project.status !== 'in_progress' &&
+          project.status !== 'quoted') {
+        alert("استعلام فقط برای پروژه‌های تایید شده مجاز است.");
+        return;
+      }
+
+      const device = devices.find(d => d.id === deviceId);
+      if (!device) return;
+
+      const breakdown = calculatePrice(
+        device.factory_pricelist_eur,
+        device.length_meter,
+        device.weight_unit,
+        settings
+      );
+
+      const { error } = await supabase
+        .from('project_inquiries')
+        .insert({
           project_id: projectId,
           requested_by_user_id: currentUser.id,
           device_id: device.id,
@@ -272,116 +509,92 @@ export const useStore = create<AppState>()(
           status: 'pending',
           sell_price_eur_snapshot: breakdown.FinalSellPrice,
           calculation_breakdown: breakdown,
-          created_at: new Date().toISOString(),
-        };
+        });
 
-        set(state => ({ inquiries: [newInquiry, ...state.inquiries] }));
-        syncAction('create_inquiry', newInquiry, get());
-      },
+      if (error) throw error;
+      await get().fetchInquiries();
+    } catch (error) {
+      console.error('Error creating inquiry:', error);
+    }
+  },
 
-      approveInquiry: (inquiryId) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
+  approveInquiry: async (inquiryId) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
 
-        const updateData = { status: 'approved' as InquiryStatus, admin_decision_at: new Date().toISOString() };
+      const { error } = await supabase
+        .from('project_inquiries')
+        .update({
+          status: 'approved',
+          admin_decision_at: new Date().toISOString(),
+        })
+        .eq('id', inquiryId);
 
-        set(state => ({
-          inquiries: state.inquiries.map(i => 
-            i.id === inquiryId ? { ...i, ...updateData } : i
-          )
-        }));
-        syncAction('update_inquiry_status', { id: inquiryId, ...updateData }, get());
-      },
+      if (error) throw error;
+      await get().fetchInquiries();
+    } catch (error) {
+      console.error('Error approving inquiry:', error);
+    }
+  },
 
-      rejectInquiry: (inquiryId) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
+  rejectInquiry: async (inquiryId) => {
+    try {
+      const { currentUser } = get();
+      if (currentUser?.role !== 'admin') return;
 
-        const updateData = { status: 'rejected' as InquiryStatus, admin_decision_at: new Date().toISOString() };
+      const { error } = await supabase
+        .from('project_inquiries')
+        .update({
+          status: 'rejected',
+          admin_decision_at: new Date().toISOString(),
+        })
+        .eq('id', inquiryId);
 
-        set(state => ({
-          inquiries: state.inquiries.map(i => 
-            i.id === inquiryId ? { ...i, ...updateData } : i
-          )
-        }));
-        syncAction('update_inquiry_status', { id: inquiryId, ...updateData }, get());
-      },
+      if (error) throw error;
+      await get().fetchInquiries();
+    } catch (error) {
+      console.error('Error rejecting inquiry:', error);
+    }
+  },
 
-      addComment: (projectId, body, parentId) => {
-        const { currentUser } = get();
-        if (!currentUser) return;
+  fetchComments: async (projectId) => {
+    try {
+      const { data, error } = await supabase
+        .from('project_comments')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
 
-        const newComment: ProjectComment = {
-          id: `cm-${Date.now()}`,
+      if (error) throw error;
+      set({ comments: data as ProjectComment[] });
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
+  },
+
+  addComment: async (projectId, body, parentId) => {
+    try {
+      const { currentUser } = get();
+      if (!currentUser) return;
+
+      const { error } = await supabase
+        .from('project_comments')
+        .insert({
           project_id: projectId,
           author_user_id: currentUser.id,
           author_role_snapshot: currentUser.role,
           body,
           parent_comment_id: parentId,
-          created_at: new Date().toISOString(),
-        };
-        set(state => ({ comments: [...state.comments, newComment] }));
-        syncAction('create_comment', newComment, get());
-      },
+        });
 
-      updateSettings: (newSettings) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'admin') return;
-        set(state => ({ settings: { ...state.settings, ...newSettings } }));
-        // Note: We don't typically sync settings to a table row in this simple model, 
-        // but we could if we had a 'Settings' sheet.
-      },
-
-      syncWithGoogleSheets: async () => {
-        const { settings } = get();
-        if (!settings.google_script_url) {
-          set({ syncError: 'آدرس اسکریپت گوگل وارد نشده است.' });
-          return;
-        }
-
-        set({ isSyncing: true, syncError: null });
-
-        try {
-          const response = await fetch(settings.google_script_url);
-          if (!response.ok) throw new Error('Network response was not ok');
-          
-          const data = await response.json();
-          
-          // Merge strategy: Server overwrites local for simplicity in this prototype
-          // In a real app, you'd want smarter merging.
-          if (data.users) set({ users: data.users });
-          if (data.projects) set({ projects: data.projects });
-          if (data.inquiries) set({ inquiries: data.inquiries });
-          if (data.devices) set({ devices: data.devices });
-          if (data.categories) set({ categories: data.categories });
-          if (data.comments) set({ comments: data.comments });
-          
-          set({ 
-            isSyncing: false, 
-            settings: { ...settings, last_sync_at: new Date().toISOString() } 
-          });
-          
-        } catch (error) {
-          console.error('Sync failed:', error);
-          set({ isSyncing: false, syncError: 'خطا در ارتباط با گوگل شیت. لطفا آدرس را بررسی کنید.' });
-        }
-      }
-    }),
-    {
-      name: 'damon-service-storage-v3', // Updated to v3 to force reload of new defaults
-      partialize: (state) => ({ 
-        currentUser: state.currentUser,
-        projects: state.projects,
-        comments: state.comments,
-        inquiries: state.inquiries,
-        settings: state.settings,
-        users: state.users,
-        categories: state.categories,
-        devices: state.devices
-      }), 
+      if (error) throw error;
+      await get().fetchComments(projectId);
+    } catch (error) {
+      console.error('Error adding comment:', error);
     }
-  )
-);
+  },
+}));
 
 export const useProjects = () => {
   const store = useStore();
@@ -396,8 +609,6 @@ export const useDevices = (): (Device | PublicDevice)[] => {
   const user = store.currentUser;
   if (!user) return [];
   if (user.role === 'admin') return store.devices;
-  
-  // For both 'employee' and 'sales_manager', we hide confidential fields (P, L, W)
-  // This ensures Sales Manager also cannot see Factory Price (P)
+
   return store.devices.map(({ factory_pricelist_eur, length_meter, weight_unit, ...rest }) => rest);
 };

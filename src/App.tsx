@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -11,20 +12,27 @@ import AdminCategories from './pages/admin/Categories';
 import AdminDevices from './pages/admin/Devices';
 import AdminPendingInquiries from './pages/admin/PendingInquiries';
 import MapOverview from './pages/MapOverview';
+import { useStore } from './services/api';
 
 function App() {
+  const initialize = useStore(state => state.initialize);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        
+
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="projects" element={<ProjectList />} />
           <Route path="projects/new" element={<ProjectCreate />} />
           <Route path="projects/:id" element={<ProjectDetails />} />
           <Route path="map" element={<MapOverview />} />
-          
+
           <Route path="admin/settings" element={<AdminSettings />} />
           <Route path="admin/users" element={<AdminUsers />} />
           <Route path="admin/categories" element={<AdminCategories />} />
