@@ -19,112 +19,75 @@ This application uses:
 
 ### Step 1: Create Google Sheet
 1. Create a new Google Sheet
-2. Create the following 11 tabs with exact names:
-   - **users**
-   - **categories**
-   - **devices**
-   - **settings**
-   - **projects**
-   - **project_status_history**
-   - **project_comments**
-   - **project_inquiries**
-   - **inquiry_prices_snapshot**
-   - **sessions**
-   - **audit_logs**
+2. Create the following 7 tabs (sheets): **Users**, **Projects**, **Inquiries**, **Devices**, **Categories**, **Comments**, **Sessions**
 
 ### Step 2: Configure Users Tab
-In the "users" tab, add column headers in the first row:
+In the "Users" tab, add column headers in the first row:
 ```
-id | username | password_salt | password_hash_sha256 | full_name | role (admin / sales_manager / employee) | is_active (TRUE/FALSE)
-```
-
-Then add the default admin user in the second row (passwords are hashed with SHA256 salt):
-```
-u-admin | admin | [empty] | [empty] | مدیر سیستم | admin | TRUE
+id | username | password | full_name | role | is_active
 ```
 
-After deploying the Apps Script, run the `bootstrap_setAdminPassword()` function in the Apps Script editor to set admin password to `sasan123`.
-
-### Step 3: Configure Settings Tab
-In the "settings" tab, add these column headers:
+Then add the default admin user in the second row:
 ```
-id | discount_multiplier (D) | freight_rate_per_meter_eur (F) | customs_numerator (CN) | customs_denominator (CD) | warranty_rate (WR) | commission_factor (COM) | office_factor (OFF) | profit_factor (PF) | rounding_mode | rounding_step | exchange_rate_irr_per_eur | is_active (TRUE/FALSE)
+u-admin | admin | sasan | مدیر سیستم | admin | TRUE
 ```
 
-### Step 4: Configure Other Tabs
+You can add more users as needed with the same structure.
 
-**devices:**
-```
-id | model_name | category_id | factory_pricelist_eur (P) | length_meter (L) | weight_unit (W) | is_active (TRUE/FALSE)
-```
+### Step 3: Configure Other Tabs
+Add headers to the remaining tabs. Here are the recommended column structures:
 
-**categories:**
+**Projects:**
 ```
-id | category_name | description | is_active (TRUE/FALSE)
+id | created_by_user_id | project_name | employer_name | project_type | address_text | tehran_lat | tehran_lng | status | created_at | updated_at | approval_decision_by | approval_decision_at
 ```
 
-**projects:**
+**Devices:**
 ```
-id | created_by_user_id | assigned_sales_manager_id | project_name | employer_name | project_type (مسکونی/اداری/تجاری/…) | address_text | tehran_lat | tehran_lng | additional_info | status (pending_approval/approved/rejected/…) | approval_decision_by | approval_decision_at | approval_note | created_at | updated_at
-```
-
-**project_status_history:**
-```
-id | project_id | changed_by_user_id | from_status | to_status | note | created_at
+id | model_name | category_id | factory_pricelist_eur | length_meter | weight_unit | is_active
 ```
 
-**project_comments:**
+**Categories:**
 ```
-id | project_id | author_user_id | author_role_snapshot | body | parent_comment_id | created_at
-```
-
-**project_inquiries:**
-```
-id | project_id | requested_by_user_id | device_id | category_id | quantity | query_text_snapshot | settings_id_snapshot | created_at
+id | category_name
 ```
 
-**inquiry_prices_snapshot:**
+**Inquiries:**
 ```
-id | project_inquiry_id | sell_price_eur_snapshot | sell_price_irr_snapshot | created_at
-```
-
-**sessions:**
-```
-token | user_id | expires_at (ISO datetime) | is_active (TRUE/FALSE) | ip_address | user_agent | created_at
+id | project_id | requested_by_user_id | device_id | category_id | quantity | sell_price_eur_snapshot | created_at
 ```
 
-**audit_logs:**
+**Comments:**
 ```
-id | actor_user_id | action_type | project_id | project_inquiry_id | meta_json | ip_address | user_agent | created_at
+id | project_id | author_user_id | author_role_snapshot | body | created_at
 ```
 
-### Step 5: Deploy to Google Apps Script
+**Sessions:** (Leave headers as-is, auto-populated by the app)
+```
+token | user_id
+```
+
+### Step 4: Deploy to Google Apps Script
 1. Open your Google Sheet
 2. Go to **Extensions** > **Apps Script**
-3. Copy the entire code from `google-script-template.js` file in the project
+3. Copy the entire code from `google-script-template.js` file
 4. Paste it into the Apps Script editor (replace all existing code)
-5. In the Apps Script editor, go to **Project Settings** and set these Script Properties:
-   - `SPREADSHEET_ID`: Your Google Sheet ID (found in the Sheet URL)
-   - `TOKEN_TTL_HOURS`: 24 (token expires in 24 hours)
-6. Click **Deploy** > **New Deployment**
-7. Select type: **Web app**
-8. Set "Execute as" to your Google account
-9. Set "Who has access" to **Anyone**
-10. Click Deploy and copy the generated Web App URL
+5. Click **Deploy** > **New Deployment**
+6. Select type: **Web app**
+7. Set "Execute as" to your account
+8. Set "Who has access" to **Anyone**
+9. Click Deploy and copy the generated Web App URL
 
-### Step 6: Initialize Admin Password
-1. In the Apps Script editor, find the `bootstrap_setAdminPassword()` function
-2. Click the play button to execute it (you may need to authorize)
-3. This sets the admin password hash to `sasan123`
-
-### Step 7: Configure the Frontend App
-1. Paste the Web App URL into the `GAS_BASE_URL` constant in `server.ts` (around line 8)
+### Step 5: Configure the App
+1. Paste the Web App URL into the `GAS_BASE_URL` constant in `server.ts` (line 8)
 2. The app is now ready to use
 
 Your Google Apps Script backend will be deployed with the following base URL pattern:
 ```
 https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
 ```
+
+The backend URL is configured in `server.ts` file.
 
 ## Installation
 
@@ -158,13 +121,19 @@ http://localhost:5173
 
 ## Default Login Credentials
 
-After running `bootstrap_setAdminPassword()`:
+Test the application with these credentials:
 
 **Admin:**
 - Username: `admin`
-- Password: `sasan123`
+- Password: `sasan`
 
-For other users, you can add them to the users tab or set their passwords via the admin panel using `/admin/users/set_password` endpoint.
+**Sales Manager:**
+- Username: `sales`
+- Password: `123`
+
+**Employee:**
+- Username: `emp1`
+- Password: `123`
 
 ## Features
 
@@ -209,15 +178,11 @@ All API endpoints are proxied through the Express server to avoid CORS issues an
 
 ## Security
 
-- **Password Security**: SHA256 hashing with random salt per user
-- **Token-based Authentication**: JWT-like tokens with 24-hour TTL
-- **HttpOnly Cookies**: Tokens not stored in localStorage
-- **Server-side Proxy**: Prevents token exposure to frontend
-- **Role-Based Access Control (RBAC)**: Three roles (admin, sales_manager, employee)
-- **Row-level Security**: Backend enforces data access based on user role and ownership
-- **Audit Logging**: All major actions logged with timestamp, user, IP, and user agent
-- **Session Management**: Active session tracking with expiration
-- **CORS Protection**: Proxy server handles all API communication
+- Token-based authentication
+- HttpOnly cookies (tokens not stored in localStorage)
+- Server-side proxy prevents token exposure to frontend
+- Role-based access control (RBAC)
+- Row-level security through backend
 
 ## Building for Production
 
