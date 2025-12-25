@@ -1,7 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'fs';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const envContent = readFileSync('.env', 'utf-8');
+const envVars: Record<string, string> = {};
+envContent.split('\n').forEach(line => {
+  const [key, ...valueParts] = line.split('=');
+  if (key && valueParts.length > 0) {
+    envVars[key.trim()] = valueParts.join('=').trim();
+  }
+});
+
+const supabaseUrl = envVars.VITE_SUPABASE_URL;
+const supabaseServiceKey = envVars.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing environment variables in .env file');
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
