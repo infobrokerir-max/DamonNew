@@ -18,14 +18,10 @@ import {
 import clsx from 'clsx';
 
 export default function Layout() {
-  const { currentUser, logout, fetchCurrentUser } = useStore();
+  const { currentUser, logout, inquiries } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  React.useEffect(() => {
-    fetchCurrentUser();
-  }, []);
 
   React.useEffect(() => {
     if (!currentUser) {
@@ -33,16 +29,20 @@ export default function Layout() {
     }
   }, [currentUser, navigate]);
 
+  // Close sidebar on route change (mobile)
   React.useEffect(() => {
     setIsSidebarOpen(false);
   }, [location.pathname]);
 
   if (!currentUser) return null;
 
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    logout();
     navigate('/login');
   };
+
+  // Calculate pending inquiries for badge
+  const pendingInquiriesCount = inquiries.filter(i => i.status === 'pending').length;
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -98,10 +98,11 @@ export default function Layout() {
           {currentUser.role === 'admin' && (
             <>
               <div className="pt-4 pb-2 text-xs text-slate-500 font-bold px-2">مدیریت سیستم</div>
-              <NavItem
-                to="/admin/inquiries"
-                icon={<Calculator size={20} />}
-                label="استعلام‌های منتظر تایید"
+              <NavItem 
+                to="/admin/inquiries" 
+                icon={<Calculator size={20} />} 
+                label="استعلام‌های منتظر تایید" 
+                badge={pendingInquiriesCount > 0 ? pendingInquiriesCount : undefined}
               />
               <NavItem to="/admin/settings" icon={<Settings size={20} />} label="تنظیمات قیمت" />
               <NavItem to="/admin/users" icon={<Users size={20} />} label="کاربران" />
