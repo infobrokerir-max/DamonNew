@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../services/api';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
 
 export default function Login() {
@@ -11,11 +11,11 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    const success = await login(username, password);
+    
+    const success = login(username, password);
     if (success) {
       navigate('/');
     } else {
@@ -59,21 +59,12 @@ export default function Login() {
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
-          <button
+          <button 
             type="submit"
             className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg shadow-sky-600/30"
           >
             ورود به سیستم
           </button>
-
-          <div className="text-center">
-            <Link
-              to="/reset-password"
-              className="text-sky-600 hover:text-sky-700 text-sm font-medium"
-            >
-              فراموشی رمز عبور
-            </Link>
-          </div>
         </form>
       </div>
     </div>

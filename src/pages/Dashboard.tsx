@@ -1,19 +1,14 @@
 import { useStore, useProjects } from '../services/api';
-import { useEffect } from 'react';
-import {
-  Briefcase,
-  CheckCircle2,
-  Clock,
-  AlertCircle
+import { 
+  Briefcase, 
+  CheckCircle2, 
+  Clock, 
+  AlertCircle 
 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { currentUser, loadProjects } = useStore();
+  const { currentUser } = useStore();
   const projects = useProjects();
-
-  useEffect(() => {
-    loadProjects();
-  }, []);
 
   const stats = {
     total: projects.length,

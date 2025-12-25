@@ -1,16 +1,10 @@
-import { useStore, useProjects } from '../services/api';
-import { useEffect } from 'react';
+import { useProjects } from '../services/api';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from './Dashboard';
 
 export default function MapOverview() {
-  const { loadProjects } = useStore();
   const projects = useProjects();
-
-  useEffect(() => {
-    loadProjects();
-  }, []);
 
   return (
     <div className="h-full flex flex-col">
