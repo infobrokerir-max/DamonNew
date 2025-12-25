@@ -17,9 +17,74 @@ This application uses:
 
 ## Google Apps Script Setup
 
-Your Google Apps Script backend should be deployed with the following base URL:
+### Step 1: Create Google Sheet
+1. Create a new Google Sheet
+2. Create the following 7 tabs (sheets): **Users**, **Projects**, **Inquiries**, **Devices**, **Categories**, **Comments**, **Sessions**
+
+### Step 2: Configure Users Tab
+In the "Users" tab, add column headers in the first row:
 ```
-https://script.google.com/macros/s/AKfycbyWeH17Ut3BQEvbdLB13e7WerluTExLqZOut1XgFjlCS4W4d06dfwCP1y2lTos9hUy7/exec
+id | username | password | full_name | role | is_active
+```
+
+Then add the default admin user in the second row:
+```
+u-admin | admin | sasan | مدیر سیستم | admin | TRUE
+```
+
+You can add more users as needed with the same structure.
+
+### Step 3: Configure Other Tabs
+Add headers to the remaining tabs. Here are the recommended column structures:
+
+**Projects:**
+```
+id | created_by_user_id | project_name | employer_name | project_type | address_text | tehran_lat | tehran_lng | status | created_at | updated_at | approval_decision_by | approval_decision_at
+```
+
+**Devices:**
+```
+id | model_name | category_id | factory_pricelist_eur | length_meter | weight_unit | is_active
+```
+
+**Categories:**
+```
+id | category_name
+```
+
+**Inquiries:**
+```
+id | project_id | requested_by_user_id | device_id | category_id | quantity | sell_price_eur_snapshot | created_at
+```
+
+**Comments:**
+```
+id | project_id | author_user_id | author_role_snapshot | body | created_at
+```
+
+**Sessions:** (Leave headers as-is, auto-populated by the app)
+```
+token | user_id
+```
+
+### Step 4: Deploy to Google Apps Script
+1. Open your Google Sheet
+2. Go to **Extensions** > **Apps Script**
+3. Copy the entire code from `google-script-template.js` file
+4. Paste it into the Apps Script editor (replace all existing code)
+5. Click **Deploy** > **New Deployment**
+6. Select type: **Web app**
+7. Set "Execute as" to your account
+8. Set "Who has access" to **Anyone**
+9. Click Deploy and copy the generated Web App URL
+
+### Step 5: Configure the App
+1. Paste the Web App URL into the `GAS_BASE_URL` constant in `server.ts` (line 8)
+2. The app is now ready to use
+
+Your Google Apps Script backend will be deployed with the following base URL pattern:
+```
+https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
 ```
 
 The backend URL is configured in `server.ts` file.
