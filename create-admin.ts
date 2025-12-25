@@ -26,7 +26,7 @@ async function createAdmin() {
   try {
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email: 'admin@damon.local',
-      password: 'sasan',
+      password: 'sasan123',
       options: {
         data: {
           username: 'admin',
@@ -65,7 +65,7 @@ async function createAdmin() {
 
     console.log('✓ Admin user created successfully!');
     console.log('  Username: admin');
-    console.log('  Password: sasan');
+    console.log('  Password: sasan123');
     console.log('  Email: admin@damon.local');
 
   } catch (error) {
