@@ -1,25 +1,22 @@
 import { useStore, useProjects } from '../services/api';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from './Dashboard';
-import { Search, MapPin, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Search, MapPin } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export default function ProjectList() {
   const projects = useProjects();
-  const { currentUser, deleteProject } = useStore();
+  const { currentUser, loadProjects } = useStore();
   const [search, setSearch] = useState('');
 
-  const filtered = projects.filter(p => 
-    p.project_name.includes(search) || 
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const filtered = projects.filter(p =>
+    p.project_name.includes(search) ||
     p.employer_name.includes(search)
   );
-
-  const handleDelete = (e: React.MouseEvent, projectId: string) => {
-    e.preventDefault(); // Prevent navigation
-    if (window.confirm('آیا از حذف این پروژه اطمینان دارید؟ این عملیات غیرقابل بازگشت است.')) {
-      deleteProject(projectId);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -53,21 +50,9 @@ export default function ProjectList() {
               </h3>
               <p className="text-sm text-gray-500 mb-4">{p.employer_name} | {p.project_type}</p>
               
-              <div className="flex items-start justify-between mt-auto">
-                <div className="flex items-start gap-2 text-gray-500 text-sm">
-                  <MapPin size={16} className="mt-0.5 shrink-0" />
-                  <span className="line-clamp-2">{p.address_text}</span>
-                </div>
-                
-                {currentUser?.role === 'admin' && (
-                  <button 
-                    onClick={(e) => handleDelete(e, p.id)}
-                    className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors z-10"
-                    title="حذف پروژه"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                )}
+              <div className="flex items-start gap-2 text-gray-500 text-sm mt-auto">
+                <MapPin size={16} className="mt-0.5 shrink-0" />
+                <span className="line-clamp-2">{p.address_text}</span>
               </div>
             </div>
           </Link>

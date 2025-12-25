@@ -17,8 +17,8 @@ function LocationMarker({ position, setPosition }: { position: [number, number],
 
 export default function ProjectCreate() {
   const navigate = useNavigate();
-  const { createProject } = useStore();
-  
+  const { createProject, isLoading } = useStore();
+
   const [formData, setFormData] = useState({
     project_name: '',
     employer_name: '',
@@ -26,17 +26,20 @@ export default function ProjectCreate() {
     address_text: '',
     additional_info: '',
   });
-  
-  const [position, setPosition] = useState<[number, number]>([35.6892, 51.3890]); // Tehran center
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [position, setPosition] = useState<[number, number]>([35.6892, 51.3890]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    createProject({
+    const success = await createProject({
       ...formData,
       tehran_lat: position[0],
       tehran_lng: position[1],
+      assigned_sales_manager_id: '',
     });
-    navigate('/projects');
+    if (success) {
+      navigate('/projects');
+    }
   };
 
   return (

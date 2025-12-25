@@ -18,10 +18,14 @@ import {
 import clsx from 'clsx';
 
 export default function Layout() {
-  const { currentUser, logout, inquiries } = useStore();
+  const { currentUser, logout, loadUserData } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  React.useEffect(() => {
+    loadUserData();
+  }, []);
 
   React.useEffect(() => {
     if (!currentUser) {
@@ -29,20 +33,18 @@ export default function Layout() {
     }
   }, [currentUser, navigate]);
 
-  // Close sidebar on route change (mobile)
   React.useEffect(() => {
     setIsSidebarOpen(false);
   }, [location.pathname]);
 
   if (!currentUser) return null;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
-  // Calculate pending inquiries for badge
-  const pendingInquiriesCount = inquiries.filter(i => i.status === 'pending').length;
+  const pendingInquiriesCount = 0;
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
