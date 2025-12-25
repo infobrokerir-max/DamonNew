@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -11,8 +12,15 @@ import AdminCategories from './pages/admin/Categories';
 import AdminDevices from './pages/admin/Devices';
 import AdminPendingInquiries from './pages/admin/PendingInquiries';
 import MapOverview from './pages/MapOverview';
+import { useStore } from './services/api';
 
 function App() {
+  const { initializeAuth } = useStore();
+
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
   return (
     <BrowserRouter>
       <Routes>

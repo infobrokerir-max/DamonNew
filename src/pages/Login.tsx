@@ -4,18 +4,18 @@ import { useNavigate } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
 
 export default function Login() {
-  const { login } = useStore();
+  const { login, isLoading } = useStore();
   const navigate = useNavigate();
-  
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    const success = login(username, password);
+
+    const success = await login(username, password);
     if (success) {
       navigate('/');
     } else {
@@ -59,11 +59,12 @@ export default function Login() {
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
-          <button 
+          <button
             type="submit"
-            className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg shadow-sky-600/30"
+            disabled={isLoading}
+            className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg shadow-sky-600/30"
           >
-            ورود به سیستم
+            {isLoading ? 'در حال ورود...' : 'ورود به سیستم'}
           </button>
         </form>
       </div>

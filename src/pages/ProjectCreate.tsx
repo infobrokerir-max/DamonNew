@@ -17,8 +17,8 @@ function LocationMarker({ position, setPosition }: { position: [number, number],
 
 export default function ProjectCreate() {
   const navigate = useNavigate();
-  const { createProject } = useStore();
-  
+  const { createProject, isLoading } = useStore();
+
   const [formData, setFormData] = useState({
     project_name: '',
     employer_name: '',
@@ -26,17 +26,19 @@ export default function ProjectCreate() {
     address_text: '',
     additional_info: '',
   });
-  
-  const [position, setPosition] = useState<[number, number]>([35.6892, 51.3890]); // Tehran center
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [position, setPosition] = useState<[number, number]>([35.6892, 51.3890]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    createProject({
+    const projectId = await createProject({
       ...formData,
       tehran_lat: position[0],
       tehran_lng: position[1],
     });
-    navigate('/projects');
+    if (projectId) {
+      navigate('/projects');
+    }
   };
 
   return (
@@ -121,11 +123,12 @@ export default function ProjectCreate() {
           >
             انصراف
           </button>
-          <button 
+          <button
             type="submit"
-            className="px-6 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 font-medium shadow-lg shadow-sky-600/20"
+            disabled={isLoading}
+            className="px-6 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:bg-gray-400 font-medium shadow-lg shadow-sky-600/20"
           >
-            ثبت پروژه
+            {isLoading ? 'درحال ثبت...' : 'ثبت پروژه'}
           </button>
         </div>
       </form>
