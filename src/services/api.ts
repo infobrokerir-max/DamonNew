@@ -60,18 +60,13 @@ interface AppState {
   syncWithGoogleSheets: () => Promise<void>;
 }
 
-// Helper to send data to Google Sheets (Fire and Forget or Await)
 const syncAction = async (action: string, payload: any, state: AppState) => {
   const url = state.settings.google_script_url;
   if (!url) return;
 
   try {
-    // We use no-cors mode usually for Google Scripts if we don't need response, 
-    // but here we want to ensure it's saved.
-    // Note: Google Apps Script Web App must be deployed as "Anyone" for this to work from browser without OAuth.
     await fetch(url, {
       method: 'POST',
-      mode: 'no-cors', 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, payload })
     });
@@ -333,7 +328,7 @@ export const useStore = create<AppState>()(
       },
 
       syncWithGoogleSheets: async () => {
-        const { settings } = get();
+        const { settings, users, projects, inquiries, devices, categories, comments } = get();
         if (!settings.google_script_url) {
           set({ syncError: 'آدرس اسکریپت گوگل وارد نشده است.' });
           return;
@@ -342,28 +337,34 @@ export const useStore = create<AppState>()(
         set({ isSyncing: true, syncError: null });
 
         try {
-          const response = await fetch(settings.google_script_url);
-          if (!response.ok) throw new Error('Network response was not ok');
-          
-          const data = await response.json();
-          
-          // Merge strategy: Server overwrites local for simplicity in this prototype
-          // In a real app, you'd want smarter merging.
-          if (data.users) set({ users: data.users });
-          if (data.projects) set({ projects: data.projects });
-          if (data.inquiries) set({ inquiries: data.inquiries });
-          if (data.devices) set({ devices: data.devices });
-          if (data.categories) set({ categories: data.categories });
-          if (data.comments) set({ comments: data.comments });
-          
-          set({ 
-            isSyncing: false, 
-            settings: { ...settings, last_sync_at: new Date().toISOString() } 
+          const response = await fetch(settings.google_script_url, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
           });
-          
+
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          const data = await response.json();
+
+          if (data.users?.length) set({ users: data.users });
+          if (data.projects?.length) set({ projects: data.projects });
+          if (data.inquiries?.length) set({ inquiries: data.inquiries });
+          if (data.devices?.length) set({ devices: data.devices });
+          if (data.categories?.length) set({ categories: data.categories });
+          if (data.comments?.length) set({ comments: data.comments });
+
+          set({
+            isSyncing: false,
+            syncError: null,
+            settings: { ...settings, last_sync_at: new Date().toISOString() }
+          });
+
         } catch (error) {
           console.error('Sync failed:', error);
-          set({ isSyncing: false, syncError: 'خطا در ارتباط با گوگل شیت. لطفا آدرس را بررسی کنید.' });
+          set({
+            isSyncing: false,
+            syncError: `خطا در همگام‌سازی: ${error instanceof Error ? error.message : 'نامشخص'}`
+          });
         }
       }
     }),
