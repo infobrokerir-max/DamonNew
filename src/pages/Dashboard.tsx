@@ -1,14 +1,27 @@
-import { useStore, useProjects } from '../services/api';
-import { 
-  Briefcase, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle 
+import { useState, useEffect } from 'react';
+import { useStore } from '../services/api';
+import { Project } from '../lib/types';
+import {
+  Briefcase,
+  CheckCircle2,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { currentUser } = useStore();
-  const projects = useProjects();
+  const { currentUser, fetchProjects } = useStore();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadProjects = async () => {
+      setLoading(true);
+      const data = await fetchProjects();
+      setProjects(data);
+      setLoading(false);
+    };
+    loadProjects();
+  }, []);
 
   const stats = {
     total: projects.length,
@@ -53,7 +66,9 @@ export default function Dashboard() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-4">آخرین پروژه‌ها</h3>
-        {projects.length === 0 ? (
+        {loading ? (
+          <p className="text-gray-400 text-center py-8">در حال بارگذاری...</p>
+        ) : projects.length === 0 ? (
           <p className="text-gray-400 text-center py-8">پروژه‌ای یافت نشد.</p>
         ) : (
           <div className="overflow-x-auto">

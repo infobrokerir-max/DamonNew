@@ -6,20 +6,28 @@ import { Lock, User } from 'lucide-react';
 export default function Login() {
   const { login } = useStore();
   const navigate = useNavigate();
-  
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    const success = login(username, password);
-    if (success) {
-      navigate('/');
-    } else {
-      setError('نام کاربری یا رمز عبور اشتباه است.');
+    setLoading(true);
+
+    try {
+      const success = await login(username, password);
+      if (success) {
+        navigate('/');
+      } else {
+        setError('نام کاربری یا رمز عبور اشتباه است.');
+      }
+    } catch (err) {
+      setError('خطا در ورود به سیستم');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,11 +67,12 @@ export default function Login() {
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
-          <button 
+          <button
             type="submit"
-            className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg shadow-sky-600/30"
+            disabled={loading}
+            className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg shadow-sky-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            ورود به سیستم
+            {loading ? 'در حال ورود...' : 'ورود به سیستم'}
           </button>
         </form>
       </div>
