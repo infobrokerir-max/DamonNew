@@ -44,7 +44,7 @@ async function resetAdminPassword() {
 
     const { data, error } = await supabase.auth.admin.updateUserById(
       profile.id,
-      { password: 'sasan' }
+      { password: 'sasan123' }
     );
 
     if (error) {
@@ -52,7 +52,7 @@ async function resetAdminPassword() {
     } else {
       console.log('✓ Admin password updated successfully!');
       console.log('  Username: admin');
-      console.log('  Password: sasan');
+      console.log('  Password: sasan123');
     }
   } catch (error) {
     console.error('Error:', error);
