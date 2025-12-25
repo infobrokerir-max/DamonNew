@@ -117,7 +117,7 @@ export const useStore = create<AppState>((set, get) => ({
       });
 
       if (error) {
-        set({ error: 'خطا در ورود', isLoading: false });
+        set({ error: 'نام کاربری یا رمز عبور اشتباه است', isLoading: false });
         return false;
       }
 
