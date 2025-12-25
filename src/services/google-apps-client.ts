@@ -153,6 +153,13 @@ class GoogleAppsClient {
     return this.request('POST', '/admin/users/set_password', { username, password }, true);
   }
 
+  async resetPassword(username: string, newPassword: string): Promise<ApiResponse<any>> {
+    return this.request('POST', '/dev/reset_password', {
+      username,
+      new_password: newPassword
+    });
+  }
+
   getToken(): string | null {
     return this.token;
   }
